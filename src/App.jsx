@@ -18,8 +18,8 @@ const daysDiff= d  => { if(!d) return null; return Math.ceil((new Date(d+"T12:00
 const money   = n  => "HK$" + Math.round(Number(n)||0).toLocaleString();
 const thisMonth = today().slice(0,7);
 
-async function dbGet(k){ try{ const r=await window.storage.get(k); return r?JSON.parse(r.value):null; }catch{ return null; }}
-async function dbSet(k,v){ try{ await window.storage.set(k,JSON.stringify(v)); }catch{} }
+async function dbGet(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch{ return null; }}
+async function dbSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
 
 // ── Sample Data ───────────────────────────────────────────────────────────────
 const SAMPLE_ORDERS = [
@@ -142,29 +142,29 @@ export default function App() {
 
   // ── Styles ─────────────────────────────────────────────────────────────────
   const S = {
-    app:     {fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",maxWidth:480,margin:"0 auto",minHeight:"100vh",background:C.bg,position:"relative"},
+    app:     {fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",maxWidth:520,margin:"0 auto",minHeight:"100vh",background:C.bg,position:"relative"},
     hdr:     {background:C.card,padding:"14px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:10},
     htitle:  {fontSize:18,fontWeight:700,color:C.text,letterSpacing:"-0.02em"},
     body:    {paddingBottom:76},
     nav:     {position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:20},
     ntab:    (a) => ({flex:1,padding:"10px 4px 8px",border:"none",background:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,color:a?C.purpleMid:C.muted,fontSize:10,fontWeight:a?700:400,position:"relative"}),
-    card:    {background:C.card,borderRadius:12,margin:"6px 12px",padding:"14px",border:`1px solid ${C.border}`},
+    card:    {background:C.card,borderRadius:12,margin:"8px 16px",padding:"16px",border:`1px solid ${C.border}`},
     input:   {width:"100%",padding:"12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:16,background:C.card,outline:"none",boxSizing:"border-box",fontFamily:"inherit",color:C.text,WebkitAppearance:"none"},
     textarea:{width:"100%",padding:"12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:15,background:C.card,outline:"none",resize:"vertical",minHeight:80,boxSizing:"border-box",fontFamily:"inherit",color:C.text,WebkitAppearance:"none"},
     select:  {width:"100%",padding:"12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:16,background:C.card,outline:"none",boxSizing:"border-box",fontFamily:"inherit",color:C.text,WebkitAppearance:"none"},
     label:   {fontSize:13,fontWeight:600,color:"#374151",marginBottom:5,display:"block"},
-    fg:      {marginBottom:14,padding:"0 12px"},
+    fg:      {marginBottom:14,padding:"0 16px"},
     btnP:    {width:"100%",padding:"14px",borderRadius:10,border:"none",fontSize:16,fontWeight:700,cursor:"pointer",background:C.purpleMid,color:"#fff",marginBottom:8},
     btnS:    {width:"100%",padding:"14px",borderRadius:10,border:`1px solid ${C.border}`,fontSize:16,fontWeight:500,cursor:"pointer",background:C.card,color:C.muted,marginBottom:8},
     btnD:    {width:"100%",padding:"14px",borderRadius:10,border:"none",fontSize:15,fontWeight:600,cursor:"pointer",background:C.redBg,color:C.red,marginBottom:8},
     fab:     {position:"fixed",bottom:80,right:16,width:54,height:54,borderRadius:27,background:C.purpleMid,border:"none",color:"#fff",fontSize:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 16px rgba(109,40,217,0.4)",zIndex:15,lineHeight:1},
     tag:     (col,bg) => ({fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:20,color:col,background:bg,display:"inline-block",lineHeight:"1.5",whiteSpace:"nowrap"}),
     row:     {display:"flex",alignItems:"center",justifyContent:"space-between",gap:6},
-    sl:      {padding:"14px 12px 6px",fontSize:11,fontWeight:700,color:C.faint,textTransform:"uppercase",letterSpacing:"0.06em"},
+    sl:      {padding:"14px 16px 6px",fontSize:11,fontWeight:700,color:C.faint,textTransform:"uppercase",letterSpacing:"0.06em"},
     statC:   {background:C.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${C.border}`,flex:1},
-    aRow:    (col) => ({background:col+"13",borderLeft:`3px solid ${col}`,margin:"4px 12px",padding:"11px 12px",borderRadius:"0 8px 8px 0",cursor:"pointer"}),
+    aRow:    (col) => ({background:col+"13",borderLeft:`3px solid ${col}`,margin:"6px 16px",padding:"16px 20px",borderRadius:"0 8px 8px 0",cursor:"pointer"}),
     pill:    (a,col) => ({padding:"7px 14px",borderRadius:20,border:a?`2px solid ${col}`:`1px solid ${C.border}`,background:a?col+"1a":C.card,color:a?col:C.muted,fontSize:12,fontWeight:a?700:400,cursor:"pointer"}),
-    toast_:  {position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"#1f2937",color:"#fff",padding:"9px 18px",borderRadius:20,fontSize:13,fontWeight:500,zIndex:100,whiteSpace:"nowrap",boxShadow:"0 4px 12px rgba(0,0,0,0.25)"},
+    toast_:  {position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"#1f2937",color:"#fff",padding:"9px 18px",borderRadius:20,fontSize:13,fontWeight:500,zIndex:100,whiteSpace:"nowrap",boxShadow:"0 6px 16px rgba(0,0,0,0.25)"},
     backBtn: {background:"none",border:"none",fontSize:22,cursor:"pointer",color:C.muted,padding:"0 2px",lineHeight:1},
     textBtn: (col) => ({background:"none",border:"none",fontSize:14,cursor:"pointer",color:col||C.purpleMid,fontWeight:700,padding:"4px 4px"}),
     divider: {height:1,background:C.divider,margin:"10px 0"},
