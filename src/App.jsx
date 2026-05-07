@@ -18,8 +18,8 @@ const daysDiff= d  => { if(!d) return null; return Math.ceil((new Date(d+"T12:00
 const money   = n  => Math.round(Number(n)||0).toLocaleString("ru-RU") + " смн";
 const thisMonth = today().slice(0,7);
 
-async function dbGet(k){ try{ const r=await window.storage.get(k); return r?JSON.parse(r.value):null; }catch{ return null; }}
-async function dbSet(k,v){ try{ await window.storage.set(k,JSON.stringify(v)); }catch{} }
+async function dbGet(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch{ return null; }}
+async function dbSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
 
 // ── Sample Data ───────────────────────────────────────────────────────────────
 const SAMPLE_ORDERS = [
