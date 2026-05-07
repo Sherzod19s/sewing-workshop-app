@@ -2,43 +2,42 @@ import { useState, useEffect } from "react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STATUSES = [
-  { key:"new",       label:"New",         col:"#6b7280", bg:"#f3f4f6" },
-  { key:"working",   label:"In Progress", col:"#2563eb", bg:"#dbeafe" },
-  { key:"ready",     label:"Ready ✓",     col:"#b45309", bg:"#fef3c7" },
-  { key:"delivered", label:"Delivered",   col:"#16a34a", bg:"#dcfce7" },
-  { key:"cancelled", label:"Cancelled",   col:"#dc2626", bg:"#fee2e2" },
+  { key:"new",       label:"Новый",     col:"#6b7280", bg:"#f3f4f6" },
+  { key:"working",   label:"В работе",  col:"#2563eb", bg:"#dbeafe" },
+  { key:"ready",     label:"Готов ✓",   col:"#b45309", bg:"#fef3c7" },
+  { key:"delivered", label:"Выдан",     col:"#16a34a", bg:"#dcfce7" },
+  { key:"cancelled", label:"Отменён",   col:"#dc2626", bg:"#fee2e2" },
 ];
-const ECATS = ["Fabric","Thread & Notions","Equipment","Rent","Utilities","Marketing","Other"];
+const ECATS = ["Ткани","Нитки и фурнитура","Оборудование","Аренда","Коммунальные","Реклама","Прочее"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const uid     = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const today   = () => new Date().toISOString().slice(0,10);
-const fmtDate = d  => d ? new Date(d+"T12:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"}) : "—";
+const fmtDate = d  => d ? new Date(d+"T12:00").toLocaleDateString("ru-RU",{day:"numeric",month:"short"}) : "—";
 const daysDiff= d  => { if(!d) return null; return Math.ceil((new Date(d+"T12:00")-new Date(today()+"T12:00"))/86400000); };
-const money   = n  => "HK$" + Math.round(Number(n)||0).toLocaleString();
+const money   = n  => Math.round(Number(n)||0).toLocaleString("ru-RU") + " смн";
 const thisMonth = today().slice(0,7);
 
-async function dbGet(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch{ return null; }}
-async function dbSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
+async function dbGet(k){ try{ const r=await window.storage.get(k); return r?JSON.parse(r.value):null; }catch{ return null; }}
+async function dbSet(k,v){ try{ await window.storage.set(k,JSON.stringify(v)); }catch{} }
 
 // ── Sample Data ───────────────────────────────────────────────────────────────
 const SAMPLE_ORDERS = [
-  {id:"s1",name:"Maria Chen",phone:"9123 4567",desc:"Wedding dress alteration",measurements:"Bust 86cm · Waist 68cm · Hip 92cm · Length 150cm",fabric:"White silk lace — client dropped off",notes:"Take in waist 3cm, shorten hem 5cm. Handle carefully!",status:"working",dueDate:"2026-05-10",total:1200,paid:600,createdAt:"2026-04-28"},
-  {id:"s2",name:"Sarah Wong",phone:"6234 5678",desc:"Qipao — custom made",measurements:"Bust 84cm · Waist 66cm · Hip 90cm · Height 162cm",fabric:"Red silk brocade — client providing",notes:"High collar, short sleeve, side zip",status:"new",dueDate:"2026-05-20",total:800,paid:300,createdAt:"2026-05-01"},
-  {id:"s3",name:"Emily Lam",phone:"5345 6789",desc:"School uniform hemming ×3",measurements:"All 5cm above knee",fabric:"Standard navy — already received",notes:"3 dresses, same length. Mum will collect Thursday.",status:"ready",dueDate:"2026-05-06",total:240,paid:240,createdAt:"2026-05-02"},
-  {id:"s4",name:"Jenny Ho",phone:"6456 7890",desc:"Jacket lining replacement",measurements:"Size M approx",fabric:"Navy polyester lining",notes:"Vintage blazer — handle with care",status:"delivered",dueDate:"2026-04-30",total:350,paid:350,createdAt:"2026-04-20"},
+  {id:"s1",name:"Мадина Рахимова",phone:"+992 90 123 4567",desc:"Подгонка свадебного платья",measurements:"Грудь 86 см · Талия 68 см · Бёдра 92 см · Длина 150 см",fabric:"Белое шёлковое кружево — клиент привезла",notes:"Убрать в талии 3 см, укоротить подол на 5 см. Обращаться аккуратно!",status:"working",dueDate:"2026-05-10",total:1200,paid:600,createdAt:"2026-04-28"},
+  {id:"s2",name:"Зарина Каримова",phone:"+992 91 234 5678",desc:"Национальное платье на заказ",measurements:"Грудь 84 см · Талия 66 см · Бёдра 90 см · Рост 162 см",fabric:"Атлас — клиент предоставит",notes:"Высокий воротник, длинный рукав, вышивка по краю",status:"new",dueDate:"2026-05-20",total:850,paid:300,createdAt:"2026-05-01"},
+  {id:"s3",name:"Дилбар Холова",phone:"+992 92 345 6789",desc:"Подгиб школьной формы (3 шт)",measurements:"Все на 5 см выше колена",fabric:"Тёмно-синяя — уже принесли",notes:"3 платья, одинаковая длина. Мама заберёт в четверг.",status:"ready",dueDate:"2026-05-06",total:240,paid:240,createdAt:"2026-05-02"},
+  {id:"s4",name:"Гулнора Назарова",phone:"+992 93 456 7890",desc:"Замена подкладки пиджака",measurements:"Размер M примерно",fabric:"Тёмно-синий полиэстер",notes:"Винтажный пиджак — обращаться с осторожностью",status:"delivered",dueDate:"2026-04-30",total:350,paid:350,createdAt:"2026-04-20"},
 ];
 const SAMPLE_EXPENSES = [
-  {id:"e1",desc:"Silk fabric bulk purchase",amount:1200,cat:"Fabric",date:"2026-05-01"},
-  {id:"e2",desc:"Thread & needles restock",amount:180,cat:"Thread & Notions",date:"2026-05-03"},
-  {id:"e3",desc:"Workshop rent — May",amount:3500,cat:"Rent",date:"2026-05-01"},
+  {id:"e1",desc:"Закупка ткани оптом",amount:1200,cat:"Ткани",date:"2026-05-01"},
+  {id:"e2",desc:"Нитки и иглы — пополнение",amount:180,cat:"Нитки и фурнитура",date:"2026-05-03"},
+  {id:"e3",desc:"Аренда мастерской — май",amount:3500,cat:"Аренда",date:"2026-05-01"},
 ];
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 const C = {
   purple:"#6d28d9", purpleL:"#f5f3ff", purpleMid:"#7c3aed",
-  bg:"#f7f6fb",
-  card:"#ffffff",
+  bg:"#f7f6fb", card:"#ffffff",
   text:"#111827", muted:"#6b7280", faint:"#9ca3af",
   border:"#e5e7eb", divider:"#f3f4f6",
   red:"#dc2626",   redBg:"#fef2f2",
@@ -51,28 +50,28 @@ const C = {
 export default function App() {
   const [orders,   setOrders]   = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [screen,   setScreen]   = useState("list");     // list | detail | order-form | finance | add-expense | today
+  const [screen,   setScreen]   = useState("list");
   const [tab,      setTab]      = useState("orders");
-  const [aid,      setAid]      = useState(null);        // active order id
+  const [aid,      setAid]      = useState(null);
   const [isEdit,   setIsEdit]   = useState(false);
-  const [of,       setOf]       = useState({});          // order form state
-  const [ef,       setEf]       = useState({desc:"",amount:"",cat:"Fabric",date:today()});
+  const [of,       setOf]       = useState({});
+  const [ef,       setEf]       = useState({desc:"",amount:"",cat:"Ткани",date:today()});
   const [listFilt, setListFilt] = useState("active");
   const [loaded,   setLoaded]   = useState(false);
   const [toast,    setToast]    = useState(null);
 
   useEffect(() => {
     (async () => {
-      let o = await dbGet("sw3-orders");
-      let e = await dbGet("sw3-expenses");
-      if (!o) { o = SAMPLE_ORDERS; await dbSet("sw3-orders", o); }
-      if (!e) { e = SAMPLE_EXPENSES; await dbSet("sw3-expenses", e); }
+      let o = await dbGet("sw-ru-orders");
+      let e = await dbGet("sw-ru-expenses");
+      if (!o) { o = SAMPLE_ORDERS; await dbSet("sw-ru-orders", o); }
+      if (!e) { e = SAMPLE_EXPENSES; await dbSet("sw-ru-expenses", e); }
       setOrders(o); setExpenses(e); setLoaded(true);
     })();
   }, []);
 
-  const saveO = arr => { setOrders(arr);   dbSet("sw3-orders",   arr); };
-  const saveE = arr => { setExpenses(arr); dbSet("sw3-expenses", arr); };
+  const saveO = arr => { setOrders(arr);   dbSet("sw-ru-orders",   arr); };
+  const saveE = arr => { setExpenses(arr); dbSet("sw-ru-expenses", arr); };
   const toast_= msg => { setToast(msg); setTimeout(() => setToast(null), 2400); };
 
   const goTab = t => {
@@ -92,29 +91,29 @@ export default function App() {
     setOf({...o}); setAid(id); setIsEdit(true); setScreen("order-form");
   };
   const saveOrder = () => {
-    if (!of.name?.trim() || !of.desc?.trim()) { toast_("Name & description are required"); return; }
+    if (!of.name?.trim() || !of.desc?.trim()) { toast_("Заполните имя и описание"); return; }
     let updated;
     if (isEdit) { updated = orders.map(o => o.id===aid ? {...of, id:aid} : o); }
     else        { updated = [...orders, {...of, id:uid()}]; }
-    saveO(updated); toast_("Order saved ✓");
+    saveO(updated); toast_("Заказ сохранён ✓");
     setScreen(isEdit ? "detail" : "list");
   };
   const delOrder = id => {
-    if (!confirm("Delete this order?")) return;
-    saveO(orders.filter(o => o.id!==id)); setScreen("list"); toast_("Order deleted");
+    if (!confirm("Удалить этот заказ?")) return;
+    saveO(orders.filter(o => o.id!==id)); setScreen("list"); toast_("Заказ удалён");
   };
   const setStatus = (id, s) => {
-    saveO(orders.map(o => o.id===id ? {...o,status:s} : o)); toast_("Status updated ✓");
+    saveO(orders.map(o => o.id===id ? {...o,status:s} : o)); toast_("Статус изменён ✓");
   };
   const addExpense = () => {
-    if (!ef.desc?.trim() || !ef.amount) { toast_("Description and amount required"); return; }
+    if (!ef.desc?.trim() || !ef.amount) { toast_("Заполните описание и сумму"); return; }
     saveE([...expenses, {...ef, id:uid(), amount:parseFloat(ef.amount)}]);
-    setEf({desc:"",amount:"",cat:"Fabric",date:today()});
-    toast_("Expense added ✓"); setScreen("finance");
+    setEf({desc:"",amount:"",cat:"Ткани",date:today()});
+    toast_("Расход добавлен ✓"); setScreen("finance");
   };
 
   // ── Computed ───────────────────────────────────────────────────────────────
-  const ao = orders.find(o => o.id===aid); // active order
+  const ao = orders.find(o => o.id===aid);
 
   const displayOrders = [...orders]
     .filter(o => listFilt==="active" ? (o.status!=="delivered" && o.status!=="cancelled") : true)
@@ -142,29 +141,29 @@ export default function App() {
 
   // ── Styles ─────────────────────────────────────────────────────────────────
   const S = {
-    app:     {fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",maxWidth:520,margin:"0 auto",minHeight:"100vh",background:C.bg,position:"relative"},
+    app:     {fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",maxWidth:480,margin:"0 auto",minHeight:"100vh",background:C.bg,position:"relative"},
     hdr:     {background:C.card,padding:"14px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:10},
     htitle:  {fontSize:18,fontWeight:700,color:C.text,letterSpacing:"-0.02em"},
     body:    {paddingBottom:76},
     nav:     {position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:20},
     ntab:    (a) => ({flex:1,padding:"10px 4px 8px",border:"none",background:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,color:a?C.purpleMid:C.muted,fontSize:10,fontWeight:a?700:400,position:"relative"}),
-    card:    {background:C.card,borderRadius:12,margin:"8px 16px",padding:"16px",border:`1px solid ${C.border}`},
+    card:    {background:C.card,borderRadius:12,margin:"6px 12px",padding:"14px",border:`1px solid ${C.border}`},
     input:   {width:"100%",padding:"12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:16,background:C.card,outline:"none",boxSizing:"border-box",fontFamily:"inherit",color:C.text,WebkitAppearance:"none"},
     textarea:{width:"100%",padding:"12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:15,background:C.card,outline:"none",resize:"vertical",minHeight:80,boxSizing:"border-box",fontFamily:"inherit",color:C.text,WebkitAppearance:"none"},
     select:  {width:"100%",padding:"12px",borderRadius:8,border:`1px solid ${C.border}`,fontSize:16,background:C.card,outline:"none",boxSizing:"border-box",fontFamily:"inherit",color:C.text,WebkitAppearance:"none"},
     label:   {fontSize:13,fontWeight:600,color:"#374151",marginBottom:5,display:"block"},
-    fg:      {marginBottom:14,padding:"0 16px"},
+    fg:      {marginBottom:14,padding:"0 12px"},
     btnP:    {width:"100%",padding:"14px",borderRadius:10,border:"none",fontSize:16,fontWeight:700,cursor:"pointer",background:C.purpleMid,color:"#fff",marginBottom:8},
     btnS:    {width:"100%",padding:"14px",borderRadius:10,border:`1px solid ${C.border}`,fontSize:16,fontWeight:500,cursor:"pointer",background:C.card,color:C.muted,marginBottom:8},
     btnD:    {width:"100%",padding:"14px",borderRadius:10,border:"none",fontSize:15,fontWeight:600,cursor:"pointer",background:C.redBg,color:C.red,marginBottom:8},
     fab:     {position:"fixed",bottom:80,right:16,width:54,height:54,borderRadius:27,background:C.purpleMid,border:"none",color:"#fff",fontSize:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 16px rgba(109,40,217,0.4)",zIndex:15,lineHeight:1},
     tag:     (col,bg) => ({fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:20,color:col,background:bg,display:"inline-block",lineHeight:"1.5",whiteSpace:"nowrap"}),
     row:     {display:"flex",alignItems:"center",justifyContent:"space-between",gap:6},
-    sl:      {padding:"14px 16px 6px",fontSize:11,fontWeight:700,color:C.faint,textTransform:"uppercase",letterSpacing:"0.06em"},
+    sl:      {padding:"14px 12px 6px",fontSize:11,fontWeight:700,color:C.faint,textTransform:"uppercase",letterSpacing:"0.06em"},
     statC:   {background:C.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${C.border}`,flex:1},
-    aRow:    (col) => ({background:col+"13",borderLeft:`3px solid ${col}`,margin:"6px 16px",padding:"16px 20px",borderRadius:"0 8px 8px 0",cursor:"pointer"}),
+    aRow:    (col) => ({background:col+"13",borderLeft:`3px solid ${col}`,margin:"4px 12px",padding:"11px 12px",borderRadius:"0 8px 8px 0",cursor:"pointer"}),
     pill:    (a,col) => ({padding:"7px 14px",borderRadius:20,border:a?`2px solid ${col}`:`1px solid ${C.border}`,background:a?col+"1a":C.card,color:a?col:C.muted,fontSize:12,fontWeight:a?700:400,cursor:"pointer"}),
-    toast_:  {position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"#1f2937",color:"#fff",padding:"9px 18px",borderRadius:20,fontSize:13,fontWeight:500,zIndex:100,whiteSpace:"nowrap",boxShadow:"0 6px 16px rgba(0,0,0,0.25)"},
+    toast_:  {position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"#1f2937",color:"#fff",padding:"9px 18px",borderRadius:20,fontSize:13,fontWeight:500,zIndex:100,whiteSpace:"nowrap",boxShadow:"0 4px 12px rgba(0,0,0,0.25)"},
     backBtn: {background:"none",border:"none",fontSize:22,cursor:"pointer",color:C.muted,padding:"0 2px",lineHeight:1},
     textBtn: (col) => ({background:"none",border:"none",fontSize:14,cursor:"pointer",color:col||C.purpleMid,fontWeight:700,padding:"4px 4px"}),
     divider: {height:1,background:C.divider,margin:"10px 0"},
@@ -179,9 +178,9 @@ export default function App() {
     if (status==="delivered"||status==="cancelled") return null;
     const d = daysDiff(dueDate);
     if (d===null) return null;
-    if (d<0)  return <span style={S.tag(C.red,C.redBg)}>Overdue {Math.abs(d)}d</span>;
-    if (d===0) return <span style={S.tag(C.amber,C.amberBg)}>Due today</span>;
-    if (d<=3)  return <span style={S.tag(C.amber,C.amberBg)}>Due in {d}d</span>;
+    if (d<0)  return <span style={S.tag(C.red,C.redBg)}>Просрочка {Math.abs(d)} дн</span>;
+    if (d===0) return <span style={S.tag(C.amber,C.amberBg)}>Срок сегодня</span>;
+    if (d<=3)  return <span style={S.tag(C.amber,C.amberBg)}>Через {d} дн</span>;
     return <span style={{fontSize:12,color:C.muted}}>{fmtDate(dueDate)}</span>;
   }
 
@@ -189,18 +188,18 @@ export default function App() {
   function renderList() {
     return (<>
       <div style={S.hdr}>
-        <span style={S.htitle}>🧵 Orders</span>
+        <span style={S.htitle}>🧵 Заказы</span>
         <div style={{display:"flex",gap:6}}>
-          <button style={{...S.pill(listFilt==="active",C.purpleMid),padding:"6px 13px"}} onClick={()=>setListFilt("active")}>Active</button>
-          <button style={{...S.pill(listFilt==="all",C.purpleMid),padding:"6px 13px"}} onClick={()=>setListFilt("all")}>All</button>
+          <button style={{...S.pill(listFilt==="active",C.purpleMid),padding:"6px 13px"}} onClick={()=>setListFilt("active")}>Активные</button>
+          <button style={{...S.pill(listFilt==="all",C.purpleMid),padding:"6px 13px"}} onClick={()=>setListFilt("all")}>Все</button>
         </div>
       </div>
       <div style={S.body}>
         {displayOrders.length===0 && (
           <div style={{textAlign:"center",padding:"52px 20px",color:C.faint}}>
             <div style={{fontSize:44,marginBottom:12}}>🧷</div>
-            <div style={{fontSize:16,fontWeight:600,color:C.muted}}>No orders yet</div>
-            <div style={{fontSize:13,marginTop:6}}>Tap ＋ to add your first order</div>
+            <div style={{fontSize:16,fontWeight:600,color:C.muted}}>Пока нет заказов</div>
+            <div style={{fontSize:13,marginTop:6}}>Нажмите ＋, чтобы добавить заказ</div>
           </div>
         )}
         {displayOrders.map(o => {
@@ -216,15 +215,15 @@ export default function App() {
               <div style={S.row}>
                 <DuePill dueDate={o.dueDate} status={o.status}/>
                 {bal>0
-                  ? <span style={{fontSize:13,fontWeight:700,color:C.amber}}>Owes {money(bal)}</span>
-                  : <span style={{fontSize:12,fontWeight:600,color:C.green}}>Paid ✓</span>}
+                  ? <span style={{fontSize:13,fontWeight:700,color:C.amber}}>Долг {money(bal)}</span>
+                  : <span style={{fontSize:12,fontWeight:600,color:C.green}}>Оплачено ✓</span>}
               </div>
             </div>
           );
         })}
         <div style={{height:16}}/>
       </div>
-      <button style={S.fab} onClick={openAdd} aria-label="New order">＋</button>
+      <button style={S.fab} onClick={openAdd} aria-label="Новый заказ">＋</button>
     </>);
   }
 
@@ -237,12 +236,11 @@ export default function App() {
       <div style={S.hdr}>
         <button style={S.backBtn} onClick={()=>setScreen("list")}>←</button>
         <span style={{...S.htitle,flex:1,textAlign:"center",fontSize:16,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",margin:"0 8px"}}>{ao.name}</span>
-        <button style={S.textBtn()} onClick={()=>openEdit(ao.id)}>Edit</button>
+        <button style={S.textBtn()} onClick={()=>openEdit(ao.id)}>Изменить</button>
       </div>
       <div style={S.body}>
-        {/* Status row */}
         <div style={{background:C.card,padding:"12px 12px 14px",borderBottom:`1px solid ${C.border}`}}>
-          <div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Update status</div>
+          <div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Изменить статус</div>
           <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
             {STATUSES.map(st => (
               <button key={st.key} style={S.pill(ao.status===st.key,st.col)} onClick={()=>setStatus(ao.id,st.key)}>{st.label}</button>
@@ -250,31 +248,29 @@ export default function App() {
           </div>
         </div>
 
-        {/* Key info */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"10px 12px 4px"}}>
           <div style={S.statC}>
-            <div style={{fontSize:11,color:C.faint,marginBottom:4}}>Due date</div>
+            <div style={{fontSize:11,color:C.faint,marginBottom:4}}>Срок</div>
             <div style={{fontSize:15,fontWeight:700,color:od?C.red:C.text}}>{fmtDate(ao.dueDate)}</div>
-            {od && <div style={{fontSize:10,color:C.red,fontWeight:700,marginTop:2}}>OVERDUE</div>}
-            {!od && ao.dueDate && daysDiff(ao.dueDate)>=0 && daysDiff(ao.dueDate)<=3 && <div style={{fontSize:10,color:C.amber,fontWeight:600,marginTop:2}}>Coming up soon</div>}
+            {od && <div style={{fontSize:10,color:C.red,fontWeight:700,marginTop:2}}>ПРОСРОЧЕНО</div>}
+            {!od && ao.dueDate && daysDiff(ao.dueDate)>=0 && daysDiff(ao.dueDate)<=3 && <div style={{fontSize:10,color:C.amber,fontWeight:600,marginTop:2}}>Скоро срок</div>}
           </div>
           <div style={S.statC}>
-            <div style={{fontSize:11,color:C.faint,marginBottom:5}}>Phone</div>
+            <div style={{fontSize:11,color:C.faint,marginBottom:5}}>Телефон</div>
             {ao.phone
               ? <a href={`tel:${ao.phone}`} style={{fontSize:14,fontWeight:700,color:C.purpleMid,textDecoration:"none",display:"flex",alignItems:"center",gap:5}}>📞 {ao.phone}</a>
               : <div style={{fontSize:13,color:C.faint}}>—</div>}
           </div>
         </div>
 
-        {/* Payment card */}
         <div style={{...S.card,margin:"4px 12px"}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.04em"}}>💰 Payment</div>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.04em"}}>💰 Оплата</div>
           <div style={{...S.row,marginBottom:7}}>
-            <span style={{fontSize:14,color:C.muted}}>Total price</span>
+            <span style={{fontSize:14,color:C.muted}}>Общая сумма</span>
             <span style={{fontSize:15,fontWeight:700}}>{money(ao.total)}</span>
           </div>
           <div style={{...S.row,marginBottom:7}}>
-            <span style={{fontSize:14,color:C.muted}}>Received</span>
+            <span style={{fontSize:14,color:C.muted}}>Получено</span>
             <span style={{fontSize:15,fontWeight:600,color:C.green}}>{money(ao.paid)}</span>
           </div>
           {Number(ao.total)>0 && (
@@ -286,18 +282,18 @@ export default function App() {
           )}
           <div style={S.divider}/>
           <div style={S.row}>
-            <span style={{fontSize:14,fontWeight:700,color:bal>0?C.amber:C.green}}>Balance due</span>
+            <span style={{fontSize:14,fontWeight:700,color:bal>0?C.amber:C.green}}>Остаток</span>
             <span style={{fontSize:20,fontWeight:700,color:bal>0?C.amber:C.green}}>{money(bal)}</span>
           </div>
         </div>
 
-        {ao.desc && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>📋 Order</div><div style={{fontSize:15,color:C.text}}>{ao.desc}</div></div>}
-        {ao.measurements && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>📐 Measurements</div><div style={{fontSize:13,color:C.text,whiteSpace:"pre-wrap",fontFamily:"monospace",lineHeight:1.8,background:"#fafaf8",padding:"8px 10px",borderRadius:6}}>{ao.measurements}</div></div>}
-        {ao.fabric && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>🪡 Fabric & Materials</div><div style={{fontSize:14,color:C.text}}>{ao.fabric}</div></div>}
-        {ao.notes && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>📝 Notes</div><div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{ao.notes}</div></div>}
+        {ao.desc && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>📋 Заказ</div><div style={{fontSize:15,color:C.text}}>{ao.desc}</div></div>}
+        {ao.measurements && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>📐 Мерки</div><div style={{fontSize:13,color:C.text,whiteSpace:"pre-wrap",fontFamily:"monospace",lineHeight:1.8,background:"#fafaf8",padding:"8px 10px",borderRadius:6}}>{ao.measurements}</div></div>}
+        {ao.fabric && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>🪡 Ткань и материалы</div><div style={{fontSize:14,color:C.text}}>{ao.fabric}</div></div>}
+        {ao.notes && <div style={{...S.card,margin:"4px 12px"}}><div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:6,textTransform:"uppercase"}}>📝 Заметки</div><div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{ao.notes}</div></div>}
 
         <div style={{padding:"8px 12px 16px"}}>
-          <button style={S.btnD} onClick={()=>delOrder(ao.id)}>Delete order</button>
+          <button style={S.btnD} onClick={()=>delOrder(ao.id)}>Удалить заказ</button>
         </div>
       </div>
     </>);
@@ -311,45 +307,43 @@ export default function App() {
     return (<>
       <div style={S.hdr}>
         <button style={S.backBtn} onClick={()=>setScreen(isEdit?"detail":"list")}>←</button>
-        <span style={{...S.htitle,flex:1,textAlign:"center",fontSize:16}}>{isEdit?"Edit Order":"New Order"}</span>
+        <span style={{...S.htitle,flex:1,textAlign:"center",fontSize:16}}>{isEdit?"Редактировать":"Новый заказ"}</span>
         <div style={{width:40}}/>
       </div>
       <div style={S.body}>
         <div style={{height:12}}/>
-        <div style={S.fg}><label style={S.label}>Customer name *</label><input style={S.input} value={f.name||""} onChange={e=>set("name",e.target.value)} placeholder="e.g. Maria Chen"/></div>
-        <div style={S.fg}><label style={S.label}>Phone number</label><input style={S.input} type="tel" value={f.phone||""} onChange={e=>set("phone",e.target.value)} placeholder="e.g. 9123 4567"/></div>
-        <div style={S.fg}><label style={S.label}>Description *</label><input style={S.input} value={f.desc||""} onChange={e=>set("desc",e.target.value)} placeholder="e.g. Wedding dress alteration"/></div>
-        <div style={S.fg}><label style={S.label}>Due / pickup date</label><input style={S.input} type="date" value={f.dueDate||""} onChange={e=>set("dueDate",e.target.value)}/></div>
+        <div style={S.fg}><label style={S.label}>Имя клиента *</label><input style={S.input} value={f.name||""} onChange={e=>set("name",e.target.value)} placeholder="напр. Мадина Рахимова"/></div>
+        <div style={S.fg}><label style={S.label}>Телефон</label><input style={S.input} type="tel" value={f.phone||""} onChange={e=>set("phone",e.target.value)} placeholder="напр. +992 90 123 4567"/></div>
+        <div style={S.fg}><label style={S.label}>Описание *</label><input style={S.input} value={f.desc||""} onChange={e=>set("desc",e.target.value)} placeholder="напр. Подгонка свадебного платья"/></div>
+        <div style={S.fg}><label style={S.label}>Срок / дата выдачи</label><input style={S.input} type="date" value={f.dueDate||""} onChange={e=>set("dueDate",e.target.value)}/></div>
         <div style={S.fg}>
-          <label style={S.label}>Status</label>
+          <label style={S.label}>Статус</label>
           <select style={S.select} value={f.status||"new"} onChange={e=>set("status",e.target.value)}>
             {STATUSES.map(st=><option key={st.key} value={st.key}>{st.label}</option>)}
           </select>
         </div>
 
-        {/* Payment section */}
         <div style={{background:"#faf9ff",borderTop:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`,padding:"12px 12px 14px",marginBottom:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.purpleMid,marginBottom:12,textTransform:"uppercase",letterSpacing:"0.04em"}}>💰 Payment</div>
+          <div style={{fontSize:12,fontWeight:700,color:C.purpleMid,marginBottom:12,textTransform:"uppercase",letterSpacing:"0.04em"}}>💰 Оплата</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-            <div><label style={S.label}>Total price (HK$)</label><input style={S.input} type="number" inputMode="numeric" value={f.total||""} onChange={e=>set("total",e.target.value)} placeholder="0"/></div>
-            <div><label style={S.label}>Amount received</label><input style={S.input} type="number" inputMode="numeric" value={f.paid||""} onChange={e=>set("paid",e.target.value)} placeholder="0"/></div>
+            <div><label style={S.label}>Сумма (смн)</label><input style={S.input} type="number" inputMode="numeric" value={f.total||""} onChange={e=>set("total",e.target.value)} placeholder="0"/></div>
+            <div><label style={S.label}>Получено (смн)</label><input style={S.input} type="number" inputMode="numeric" value={f.paid||""} onChange={e=>set("paid",e.target.value)} placeholder="0"/></div>
           </div>
           {Number(f.total)>0 && <div style={{...S.row}}>
-            <span style={{fontSize:13,color:C.muted}}>Balance remaining:</span>
+            <span style={{fontSize:13,color:C.muted}}>Остаток:</span>
             <span style={{fontSize:14,fontWeight:700,color:bal>0?C.amber:C.green}}>{money(bal)}</span>
           </div>}
         </div>
 
-        {/* Details section */}
-        <div style={{padding:"0 12px 4px 12px",fontSize:12,fontWeight:700,color:C.text,textTransform:"uppercase",letterSpacing:"0.04em"}}>📐 Measurements & Details</div>
+        <div style={{padding:"0 12px 4px 12px",fontSize:12,fontWeight:700,color:C.text,textTransform:"uppercase",letterSpacing:"0.04em"}}>📐 Мерки и детали</div>
         <div style={{height:8}}/>
-        <div style={S.fg}><label style={S.label}>Measurements</label><textarea style={S.textarea} value={f.measurements||""} onChange={e=>set("measurements",e.target.value)} placeholder={"Bust, waist, hip, length...\ne.g. Bust 86cm · Waist 68cm · Hip 92cm"}/></div>
-        <div style={S.fg}><label style={S.label}>Fabric & materials</label><textarea style={S.textarea} value={f.fabric||""} onChange={e=>set("fabric",e.target.value)} placeholder="Fabric type, colour, who's providing..."/></div>
-        <div style={S.fg}><label style={S.label}>Notes</label><textarea style={S.textarea} value={f.notes||""} onChange={e=>set("notes",e.target.value)} placeholder="Alterations, special instructions, client requests..."/></div>
+        <div style={S.fg}><label style={S.label}>Мерки</label><textarea style={S.textarea} value={f.measurements||""} onChange={e=>set("measurements",e.target.value)} placeholder={"Грудь, талия, бёдра, длина...\nнапр. Грудь 86 см · Талия 68 см · Бёдра 92 см"}/></div>
+        <div style={S.fg}><label style={S.label}>Ткань и материалы</label><textarea style={S.textarea} value={f.fabric||""} onChange={e=>set("fabric",e.target.value)} placeholder="Тип ткани, цвет, кто предоставит..."/></div>
+        <div style={S.fg}><label style={S.label}>Заметки</label><textarea style={S.textarea} value={f.notes||""} onChange={e=>set("notes",e.target.value)} placeholder="Подгонка, особые пожелания клиента..."/></div>
 
         <div style={{padding:"4px 12px 16px"}}>
-          <button style={S.btnP} onClick={saveOrder}>Save order</button>
-          <button style={S.btnS} onClick={()=>setScreen(isEdit?"detail":"list")}>Cancel</button>
+          <button style={S.btnP} onClick={saveOrder}>Сохранить</button>
+          <button style={S.btnS} onClick={()=>setScreen(isEdit?"detail":"list")}>Отмена</button>
         </div>
       </div>
     </>);
@@ -359,44 +353,41 @@ export default function App() {
   function renderFinance() {
     return (<>
       <div style={S.hdr}>
-        <span style={S.htitle}>💰 Finance</span>
-        <button style={{...S.textBtn(),fontSize:13}} onClick={()=>setScreen("add-expense")}>+ Expense</button>
+        <span style={S.htitle}>💰 Финансы</span>
+        <button style={{...S.textBtn(),fontSize:13}} onClick={()=>setScreen("add-expense")}>+ Расход</button>
       </div>
       <div style={S.body}>
-        {/* Month summary */}
         <div style={{padding:"10px 12px 6px"}}>
-          <div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>This month — {new Date().toLocaleDateString("en-GB",{month:"long",year:"numeric"})}</div>
+          <div style={{fontSize:11,fontWeight:700,color:C.faint,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Этот месяц — {new Date().toLocaleDateString("ru-RU",{month:"long",year:"numeric"})}</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
             <div style={S.statC}>
-              <div style={{fontSize:10,color:C.faint,marginBottom:4}}>Income</div>
+              <div style={{fontSize:10,color:C.faint,marginBottom:4}}>Доход</div>
               <div style={{fontSize:15,fontWeight:700,color:C.green}}>{money(mIncome)}</div>
             </div>
             <div style={S.statC}>
-              <div style={{fontSize:10,color:C.faint,marginBottom:4}}>Expenses</div>
+              <div style={{fontSize:10,color:C.faint,marginBottom:4}}>Расходы</div>
               <div style={{fontSize:15,fontWeight:700,color:C.red}}>{money(mExpTotal)}</div>
             </div>
             <div style={{...S.statC,background:mProfit>=0?C.greenBg:C.redBg,border:`1px solid ${mProfit>=0?C.green+"44":C.red+"44"}`}}>
-              <div style={{fontSize:10,color:mProfit>=0?C.green:C.red,marginBottom:4}}>Profit</div>
+              <div style={{fontSize:10,color:mProfit>=0?C.green:C.red,marginBottom:4}}>Прибыль</div>
               <div style={{fontSize:15,fontWeight:700,color:mProfit>=0?C.green:C.red}}>{money(mProfit)}</div>
             </div>
           </div>
         </div>
 
-        {/* Pending collections */}
         {totalOwed>0 && <div style={{...S.card,margin:"4px 12px",borderLeft:`3px solid ${C.amber}`,background:C.amberBg}}>
           <div style={S.row}>
             <div>
-              <div style={{fontSize:13,fontWeight:600,color:C.text}}>Pending collections</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:3}}>Still owed across active orders</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text}}>К получению</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:3}}>Должны клиенты по активным заказам</div>
             </div>
-            <div style={{fontSize:22,fontWeight:700,color:C.amber}}>{money(totalOwed)}</div>
+            <div style={{fontSize:20,fontWeight:700,color:C.amber}}>{money(totalOwed)}</div>
           </div>
         </div>}
 
-        {/* Active orders payment breakdown */}
-        <div style={S.sl}>Active orders — payment status</div>
+        <div style={S.sl}>Активные заказы — оплата</div>
         {orders.filter(o=>o.status!=="delivered"&&o.status!=="cancelled").length===0
-          ? <div style={{textAlign:"center",padding:"14px",color:C.faint,fontSize:13}}>No active orders</div>
+          ? <div style={{textAlign:"center",padding:"14px",color:C.faint,fontSize:13}}>Нет активных заказов</div>
           : orders.filter(o=>o.status!=="delivered"&&o.status!=="cancelled").map(o=>{
               const bal=Math.max(0,Number(o.total||0)-Number(o.paid||0));
               const pct=Number(o.total)>0?Math.min(100,Math.round(Number(o.paid||0)/Number(o.total)*100)):0;
@@ -408,7 +399,7 @@ export default function App() {
                       <div style={{fontSize:11,color:C.muted,marginTop:2}}>{o.desc}</div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:bal>0?C.amber:C.green}}>{bal>0?`Owes ${money(bal)}`:"Paid ✓"}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:bal>0?C.amber:C.green}}>{bal>0?`Долг ${money(bal)}`:"Оплачено ✓"}</div>
                       {Number(o.total)>0&&<div style={{fontSize:11,color:C.faint,marginTop:2}}>{money(o.paid)} / {money(o.total)}</div>}
                     </div>
                   </div>
@@ -420,13 +411,12 @@ export default function App() {
             })
         }
 
-        {/* Expenses */}
         <div style={{...S.sl,display:"flex",alignItems:"center",justifyContent:"space-between",paddingRight:12}}>
-          <span>Expenses this month</span>
-          <button style={S.textBtn()} onClick={()=>setScreen("add-expense")}>Add</button>
+          <span>Расходы за месяц</span>
+          <button style={S.textBtn()} onClick={()=>setScreen("add-expense")}>Добавить</button>
         </div>
         {mExps.length===0
-          ? <div style={{textAlign:"center",padding:"14px",color:C.faint,fontSize:13}}>No expenses logged</div>
+          ? <div style={{textAlign:"center",padding:"14px",color:C.faint,fontSize:13}}>Расходов нет</div>
           : [...mExps].reverse().map(e=>(
               <div key={e.id} style={{...S.card,margin:"4px 12px"}}>
                 <div style={S.row}>
@@ -436,7 +426,7 @@ export default function App() {
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{fontSize:15,fontWeight:700,color:C.red}}>−{money(e.amount)}</div>
-                    <button onClick={()=>{if(confirm("Delete this expense?"))saveE(expenses.filter(x=>x.id!==e.id));}} style={{background:"none",border:"none",color:C.faint,cursor:"pointer",fontSize:18,padding:"2px 4px",lineHeight:1}}>×</button>
+                    <button onClick={()=>{if(confirm("Удалить расход?"))saveE(expenses.filter(x=>x.id!==e.id));}} style={{background:"none",border:"none",color:C.faint,cursor:"pointer",fontSize:18,padding:"2px 4px",lineHeight:1}}>×</button>
                   </div>
                 </div>
               </div>
@@ -454,23 +444,23 @@ export default function App() {
     return (<>
       <div style={S.hdr}>
         <button style={S.backBtn} onClick={()=>setScreen("finance")}>←</button>
-        <span style={{...S.htitle,flex:1,textAlign:"center",fontSize:16}}>Add Expense</span>
+        <span style={{...S.htitle,flex:1,textAlign:"center",fontSize:16}}>Добавить расход</span>
         <div style={{width:40}}/>
       </div>
       <div style={S.body}>
         <div style={{height:16}}/>
-        <div style={S.fg}><label style={S.label}>Description *</label><input style={S.input} value={f.desc||""} onChange={e=>set("desc",e.target.value)} placeholder="e.g. Silk fabric purchase"/></div>
-        <div style={S.fg}><label style={S.label}>Amount (HK$) *</label><input style={S.input} type="number" inputMode="numeric" value={f.amount||""} onChange={e=>set("amount",e.target.value)} placeholder="0"/></div>
+        <div style={S.fg}><label style={S.label}>Описание *</label><input style={S.input} value={f.desc||""} onChange={e=>set("desc",e.target.value)} placeholder="напр. Закупка ткани"/></div>
+        <div style={S.fg}><label style={S.label}>Сумма (смн) *</label><input style={S.input} type="number" inputMode="numeric" value={f.amount||""} onChange={e=>set("amount",e.target.value)} placeholder="0"/></div>
         <div style={S.fg}>
-          <label style={S.label}>Category</label>
+          <label style={S.label}>Категория</label>
           <select style={S.select} value={f.cat} onChange={e=>set("cat",e.target.value)}>
             {ECATS.map(c=><option key={c}>{c}</option>)}
           </select>
         </div>
-        <div style={S.fg}><label style={S.label}>Date</label><input style={S.input} type="date" value={f.date||""} onChange={e=>set("date",e.target.value)}/></div>
+        <div style={S.fg}><label style={S.label}>Дата</label><input style={S.input} type="date" value={f.date||""} onChange={e=>set("date",e.target.value)}/></div>
         <div style={{padding:"4px 12px 16px"}}>
-          <button style={S.btnP} onClick={addExpense}>Add expense</button>
-          <button style={S.btnS} onClick={()=>setScreen("finance")}>Cancel</button>
+          <button style={S.btnP} onClick={addExpense}>Сохранить</button>
+          <button style={S.btnS} onClick={()=>setScreen("finance")}>Отмена</button>
         </div>
       </div>
     </>);
@@ -481,20 +471,20 @@ export default function App() {
     const all = overdue.length+dueToday_.length+dueSoon_.length+readyPU.length;
     return (<>
       <div style={S.hdr}>
-        <span style={S.htitle}>⚡ Today</span>
-        <span style={{fontSize:12,color:C.muted}}>{new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</span>
+        <span style={S.htitle}>⚡ Сегодня</span>
+        <span style={{fontSize:12,color:C.muted}}>{new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"short"})}</span>
       </div>
       <div style={S.body}>
         {all===0 && (
           <div style={{textAlign:"center",padding:"52px 20px",color:C.faint}}>
             <div style={{fontSize:44,marginBottom:12}}>✅</div>
-            <div style={{fontSize:16,fontWeight:600,color:C.muted}}>All clear!</div>
-            <div style={{fontSize:13,marginTop:6}}>No urgent items for today.</div>
+            <div style={{fontSize:16,fontWeight:600,color:C.muted}}>Всё под контролем!</div>
+            <div style={{fontSize:13,marginTop:6}}>Срочных дел на сегодня нет.</div>
           </div>
         )}
 
         {overdue.length>0 && (<>
-          <div style={S.sl}>🔴 Overdue ({overdue.length})</div>
+          <div style={S.sl}>🔴 Просрочено ({overdue.length})</div>
           {overdue.map(o=>(
             <div key={o.id} style={S.aRow(C.red)} onClick={()=>openDetail(o.id)}>
               <div style={S.row}>
@@ -503,7 +493,7 @@ export default function App() {
                   <div style={{fontSize:12,color:C.muted,marginTop:3}}>{o.desc}</div>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.red}}>Was due {fmtDate(o.dueDate)}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:C.red}}>Срок был {fmtDate(o.dueDate)}</div>
                   <div style={{marginTop:4}}><Badge status={o.status}/></div>
                 </div>
               </div>
@@ -512,7 +502,7 @@ export default function App() {
         </>)}
 
         {dueToday_.length>0 && (<>
-          <div style={S.sl}>🟡 Due today ({dueToday_.length})</div>
+          <div style={S.sl}>🟡 На сегодня ({dueToday_.length})</div>
           {dueToday_.map(o=>(
             <div key={o.id} style={S.aRow(C.amber)} onClick={()=>openDetail(o.id)}>
               <div style={S.row}>
@@ -527,7 +517,7 @@ export default function App() {
         </>)}
 
         {readyPU.length>0 && (<>
-          <div style={S.sl}>🛍 Ready for pickup ({readyPU.length})</div>
+          <div style={S.sl}>🛍 Готовы к выдаче ({readyPU.length})</div>
           {readyPU.map(o=>{
             const bal=Math.max(0,Number(o.total||0)-Number(o.paid||0));
             return(
@@ -536,10 +526,10 @@ export default function App() {
                   <div style={{flex:1}}>
                     <div style={{fontSize:15,fontWeight:700,color:C.text}}>{o.name}</div>
                     <div style={{fontSize:12,color:C.muted,marginTop:3}}>{o.desc}</div>
-                    {bal>0&&<div style={{fontSize:12,fontWeight:700,color:C.amber,marginTop:4}}>Collect {money(bal)} on pickup</div>}
+                    {bal>0&&<div style={{fontSize:12,fontWeight:700,color:C.amber,marginTop:4}}>При выдаче получить {money(bal)}</div>}
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
-                    {o.phone && <a href={`tel:${o.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:13,color:C.purpleMid,fontWeight:700,textDecoration:"none",display:"block",padding:"6px 0"}}>📞 Call</a>}
+                    {o.phone && <a href={`tel:${o.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:13,color:C.purpleMid,fontWeight:700,textDecoration:"none",display:"block",padding:"6px 0"}}>📞 Позвонить</a>}
                   </div>
                 </div>
               </div>
@@ -548,7 +538,7 @@ export default function App() {
         </>)}
 
         {dueSoon_.length>0 && (<>
-          <div style={S.sl}>🔵 Due in 1–3 days ({dueSoon_.length})</div>
+          <div style={S.sl}>🔵 Через 1–3 дня ({dueSoon_.length})</div>
           {dueSoon_.map(o=>(
             <div key={o.id} style={S.aRow(C.blue)} onClick={()=>openDetail(o.id)}>
               <div style={S.row}>
@@ -557,7 +547,7 @@ export default function App() {
                   <div style={{fontSize:12,color:C.muted,marginTop:3}}>{o.desc}</div>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0}}>
-                  <div style={{fontSize:12,fontWeight:600,color:C.blue}}>Due {fmtDate(o.dueDate)}</div>
+                  <div style={{fontSize:12,fontWeight:600,color:C.blue}}>Срок {fmtDate(o.dueDate)}</div>
                   <div style={{marginTop:4}}><Badge status={o.status}/></div>
                 </div>
               </div>
@@ -570,7 +560,7 @@ export default function App() {
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  if (!loaded) return <div style={{...S.app,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}><div style={{color:C.faint,fontSize:14}}>Loading…</div></div>;
+  if (!loaded) return <div style={{...S.app,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}><div style={{color:C.faint,fontSize:14}}>Загрузка…</div></div>;
 
   return (
     <div style={S.app}>
@@ -586,15 +576,15 @@ export default function App() {
       <nav style={S.nav}>
         <button style={S.ntab(tab==="orders")} onClick={()=>goTab("orders")}>
           <span style={{fontSize:22}}>📋</span>
-          <span>Orders</span>
+          <span>Заказы</span>
         </button>
         <button style={S.ntab(tab==="finance")} onClick={()=>goTab("finance")}>
           <span style={{fontSize:22}}>💰</span>
-          <span>Finance</span>
+          <span>Финансы</span>
         </button>
         <button style={S.ntab(tab==="today")} onClick={()=>goTab("today")}>
           <span style={{fontSize:22}}>⚡</span>
-          <span>Today{urgentCount>0?` (${urgentCount})`:""}</span>
+          <span>Сегодня{urgentCount>0?` (${urgentCount})`:""}</span>
           {urgentCount>0 && <span style={{position:"absolute",top:6,right:"calc(50% - 14px)",width:8,height:8,borderRadius:4,background:C.red,border:`2px solid ${C.card}`}}/>}
         </button>
       </nav>
