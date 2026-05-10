@@ -75,10 +75,10 @@ const C = {
 export default function App() {
   const [orders,   setOrders]   = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [screen,   setScreen]   = useState("list");
-  const [tab,      setTab]      = useState("orders");
+  const [screen,   setScreen]   = useState("today");
+  const [tab,      setTab]      = useState("today");
   const [aid,      setAid]      = useState(null);
-  const [eaid,     setEaid]     = useState(null);     // active expense id being edited
+  const [eaid,     setEaid]     = useState(null);
   const [isEdit,   setIsEdit]   = useState(false);
   const [of,       setOf]       = useState({});
   const [ef,       setEf]       = useState({desc:"",amount:"",cat:"Ткани",date:today()});
@@ -86,10 +86,15 @@ export default function App() {
   const [selMonth, setSelMonth] = useState(getThisMonth());
   const [loaded,   setLoaded]   = useState(false);
   const [toast,    setToast]    = useState(null);
-  const [confirmDel,setConfirmDel]=useState(false);   // two-tap delete confirmation
+  const [confirmDel,setConfirmDel]=useState(false);
+  const [notifPerm, setNotifPerm]=useState("default"); // browser notification permission
 
-  // Reset delete-confirm whenever user navigates away
   useEffect(()=>{setConfirmDel(false);},[screen]);
+
+  // Check notification permission on load
+  useEffect(()=>{
+    if(typeof Notification!=="undefined") setNotifPerm(Notification.permission);
+  },[]);
 
   useEffect(()=>{
     (async()=>{
@@ -195,9 +200,35 @@ export default function App() {
   const active   =orders.filter(o=>o.status!=="delivered"&&o.status!=="cancelled");
   const overdue  =active.filter(o=>{const d=daysDiff(o.dueDate);return d!==null&&d<0;});
   const dueToday_=active.filter(o=>daysDiff(o.dueDate)===0);
-  const dueSoon_ =active.filter(o=>{const d=daysDiff(o.dueDate);return d!==null&&d>0&&d<=3;});
+  const dueTomorrow_=active.filter(o=>daysDiff(o.dueDate)===1);
+  const dueSoon_ =active.filter(o=>{const d=daysDiff(o.dueDate);return d!==null&&d>1&&d<=3;});
+  const dueWeek_ =active.filter(o=>{const d=daysDiff(o.dueDate);return d!==null&&d>3&&d<=7;});
   const readyPU  =orders.filter(o=>o.status==="ready");
   const urgentCount=overdue.length+dueToday_.length+readyPU.length;
+  const todayActionable=overdue.length+dueToday_.length;
+
+  // Fire morning briefing notification once per day when app opens
+  useEffect(()=>{
+    if(!loaded||typeof Notification==="undefined"||Notification.permission!=="granted")return;
+    const lastNotif=localStorage.getItem("sw-last-notif");
+    if(lastNotif===today())return;
+    if(todayActionable===0&&readyPU.length===0)return;
+    const parts=[];
+    if(overdue.length)    parts.push(`🔴 ${overdue.length} просрочено`);
+    if(dueToday_.length)  parts.push(`🟡 ${dueToday_.length} на сегодня`);
+    if(readyPU.length)    parts.push(`🛍 ${readyPU.length} к выдаче`);
+    try{
+      new Notification("🧵 План на сегодня",{body:parts.join(" · "),icon:"/favicon.ico"});
+      localStorage.setItem("sw-last-notif",today());
+    }catch(e){}
+  },[loaded]);
+
+  const requestNotif=async()=>{
+    if(typeof Notification==="undefined"){toast_("Браузер не поддерживает");return;}
+    const p=await Notification.requestPermission();
+    setNotifPerm(p);
+    if(p==="granted")toast_("Напоминания включены ✓");
+  };
 
   const displayOrders=[...orders]
     .filter(o=>listFilt==="active"?(o.status!=="delivered"&&o.status!=="cancelled"):true)
@@ -420,16 +451,133 @@ export default function App() {
     </>);
   }
 
+  // Reusable card renderer for orders in Today screen
+  function todayCard(o, accent){
+    const bal=Math.max(0,Number(o.total||0)-Number(o.paid||0));
+    return(
+      <div key={o.id} style={{background:C.card,borderLeft:`4px solid ${accent}`,margin:"6px 12px",padding:"12px 14px",borderRadius:"0 10px 10px 0",cursor:"pointer",border:`1px solid ${C.border}`,borderLeftWidth:4,borderLeftColor:accent}} onClick={()=>openDetail(o.id)}>
+        <div style={{...S.row,marginBottom:6}}>
+          <span style={{fontSize:15,fontWeight:700,color:C.text,flex:1,marginRight:8}}>{o.name}</span>
+          <Badge status={o.status}/>
+        </div>
+        <div style={{fontSize:13,color:C.muted,marginBottom:8,lineHeight:1.4}}>{o.desc}</div>
+        <div style={S.row}>
+          <span style={{fontSize:12,color:accent,fontWeight:600}}>Срок: {fmtDate(o.dueDate)}</span>
+          {bal>0
+            ? <span style={{fontSize:12,fontWeight:700,color:C.amber}}>Долг {money(bal)}</span>
+            : <span style={{fontSize:11,color:C.green,fontWeight:600}}>Оплачено ✓</span>}
+        </div>
+      </div>
+    );
+  }
+
   function renderToday(){
-    const all=overdue.length+dueToday_.length+dueSoon_.length+readyPU.length;
+    const totalActive=overdue.length+dueToday_.length+dueTomorrow_.length+dueSoon_.length+dueWeek_.length;
+    const allEmpty=totalActive===0&&readyPU.length===0;
+    const dayName=new Date().toLocaleDateString("ru-RU",{weekday:"long"});
+    const dateLong=new Date().toLocaleDateString("ru-RU",{day:"numeric",month:"long"});
+
+    // Morning briefing message
+    let briefing;
+    if(allEmpty){
+      briefing={emoji:"☀️",title:"Хороший день!",sub:"Срочных дел нет."};
+    }else if(overdue.length>0){
+      briefing={emoji:"⚠️",title:`${overdue.length} ${overdue.length===1?"заказ просрочен":"заказа просрочено"}`,sub:"Свяжитесь с клиентами в первую очередь"};
+    }else if(dueToday_.length>0){
+      briefing={emoji:"🎯",title:`${dueToday_.length} ${dueToday_.length===1?"заказ":"заказа"} на сегодня`,sub:"Сосредоточьтесь на этих заказах"};
+    }else if(readyPU.length>0){
+      briefing={emoji:"🛍",title:`${readyPU.length} ${readyPU.length===1?"заказ готов":"заказа готовы"}`,sub:"Позвоните клиентам для выдачи"};
+    }else{
+      briefing={emoji:"✨",title:"Спокойный день",sub:`${totalActive} ${totalActive===1?"заказ в работе":"заказов в работе"}`};
+    }
+
     return(<>
-      <div style={S.hdr}><span style={S.htitle}>⚡ Сегодня</span><span style={{fontSize:12,color:C.muted}}>{new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"short"})}</span></div>
+      <div style={S.hdr}>
+        <div>
+          <div style={{fontSize:18,fontWeight:700,color:C.text,letterSpacing:"-0.02em",textTransform:"capitalize"}}>{dayName}</div>
+          <div style={{fontSize:11,color:C.muted,marginTop:1}}>{dateLong}</div>
+        </div>
+        {notifPerm!=="granted"&&typeof Notification!=="undefined"&&<button onClick={requestNotif} style={{...S.pill(false,C.purpleMid),padding:"6px 12px",fontSize:11}}>🔔 Включить</button>}
+        {notifPerm==="granted"&&<span style={{fontSize:11,color:C.green,fontWeight:600}}>🔔 Вкл</span>}
+      </div>
       <div style={S.body}>
-        {all===0&&<div style={{textAlign:"center",padding:"52px 20px",color:C.faint}}><div style={{fontSize:44,marginBottom:12}}>✅</div><div style={{fontSize:16,fontWeight:600,color:C.muted}}>Всё под контролем!</div><div style={{fontSize:13,marginTop:6}}>Срочных дел нет.</div></div>}
-        {overdue.length>0&&<><div style={S.sl}>🔴 Просрочено ({overdue.length})</div>{overdue.map(o=><div key={o.id} style={S.aRow(C.red)} onClick={()=>openDetail(o.id)}><div style={S.row}><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>{o.name}</div><div style={{fontSize:12,color:C.muted,marginTop:3}}>{o.desc}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:12,fontWeight:700,color:C.red}}>Срок был {fmtDate(o.dueDate)}</div><div style={{marginTop:4}}><Badge status={o.status}/></div></div></div></div>)}</>}
-        {dueToday_.length>0&&<><div style={S.sl}>🟡 На сегодня ({dueToday_.length})</div>{dueToday_.map(o=><div key={o.id} style={S.aRow(C.amber)} onClick={()=>openDetail(o.id)}><div style={S.row}><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>{o.name}</div><div style={{fontSize:12,color:C.muted,marginTop:3}}>{o.desc}</div></div><Badge status={o.status}/></div></div>)}</>}
-        {readyPU.length>0&&<><div style={S.sl}>🛍 Готовы к выдаче ({readyPU.length})</div>{readyPU.map(o=>{const bal=Math.max(0,Number(o.total||0)-Number(o.paid||0));return(<div key={o.id} style={S.aRow(C.green)} onClick={()=>openDetail(o.id)}><div style={S.row}><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>{o.name}</div><div style={{fontSize:12,color:C.muted,marginTop:3}}>{o.desc}</div>{bal>0&&<div style={{fontSize:12,fontWeight:700,color:C.amber,marginTop:4}}>При выдаче получить {money(bal)}</div>}</div>{o.phone&&<a href={telHref(o.phone)} onClick={e=>e.stopPropagation()} style={{fontSize:13,color:C.purpleMid,fontWeight:700,textDecoration:"none",padding:"6px 0"}}>📞 Позвонить</a>}</div></div>);})}</>}
-        {dueSoon_.length>0&&<><div style={S.sl}>🔵 Через 1–3 дня ({dueSoon_.length})</div>{dueSoon_.map(o=><div key={o.id} style={S.aRow(C.blue)} onClick={()=>openDetail(o.id)}><div style={S.row}><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>{o.name}</div><div style={{fontSize:12,color:C.muted,marginTop:3}}>{o.desc}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:12,fontWeight:600,color:C.blue}}>Срок {fmtDate(o.dueDate)}</div><div style={{marginTop:4}}><Badge status={o.status}/></div></div></div></div>)}</>}
+
+        {/* Morning briefing hero */}
+        <div style={{margin:"12px 12px 8px",padding:"18px 16px",borderRadius:14,background:overdue.length>0?`linear-gradient(135deg, ${C.red}15, ${C.red}05)`:`linear-gradient(135deg, ${C.purpleMid}15, ${C.purpleMid}05)`,border:`1px solid ${overdue.length>0?C.red+"33":C.purpleMid+"33"}`}}>
+          <div style={{fontSize:28,marginBottom:6}}>{briefing.emoji}</div>
+          <div style={{fontSize:18,fontWeight:700,color:C.text,letterSpacing:"-0.02em",marginBottom:3}}>{briefing.title}</div>
+          <div style={{fontSize:13,color:C.muted}}>{briefing.sub}</div>
+        </div>
+
+        {/* Quick stats row */}
+        {!allEmpty&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,padding:"4px 12px 6px"}}>
+          <div style={{textAlign:"center",padding:"8px 4px",background:overdue.length>0?C.redBg:C.card,borderRadius:8,border:`1px solid ${overdue.length>0?C.red+"33":C.border}`}}>
+            <div style={{fontSize:18,fontWeight:700,color:overdue.length>0?C.red:C.faint}}>{overdue.length}</div>
+            <div style={{fontSize:9,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em"}}>Долг</div>
+          </div>
+          <div style={{textAlign:"center",padding:"8px 4px",background:dueToday_.length>0?C.amberBg:C.card,borderRadius:8,border:`1px solid ${dueToday_.length>0?C.amber+"33":C.border}`}}>
+            <div style={{fontSize:18,fontWeight:700,color:dueToday_.length>0?C.amber:C.faint}}>{dueToday_.length}</div>
+            <div style={{fontSize:9,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em"}}>Сегодня</div>
+          </div>
+          <div style={{textAlign:"center",padding:"8px 4px",background:C.card,borderRadius:8,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:18,fontWeight:700,color:dueTomorrow_.length>0?C.text:C.faint}}>{dueTomorrow_.length}</div>
+            <div style={{fontSize:9,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em"}}>Завтра</div>
+          </div>
+          <div style={{textAlign:"center",padding:"8px 4px",background:readyPU.length>0?C.greenBg:C.card,borderRadius:8,border:`1px solid ${readyPU.length>0?C.green+"33":C.border}`}}>
+            <div style={{fontSize:18,fontWeight:700,color:readyPU.length>0?C.green:C.faint}}>{readyPU.length}</div>
+            <div style={{fontSize:9,color:C.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em"}}>К выдаче</div>
+          </div>
+        </div>}
+
+        {/* SECTION: Action needed today */}
+        {(overdue.length>0||dueToday_.length>0)&&<div style={{padding:"14px 12px 4px",fontSize:11,fontWeight:700,color:C.red,textTransform:"uppercase",letterSpacing:"0.08em"}}>⚠️ Срочно — сделать сегодня</div>}
+        {overdue.map(o=>{
+          const d=Math.abs(daysDiff(o.dueDate));
+          return(
+            <div key={o.id} style={{background:C.redBg,borderLeft:`4px solid ${C.red}`,margin:"6px 12px",padding:"12px 14px",borderRadius:"0 10px 10px 0",cursor:"pointer"}} onClick={()=>openDetail(o.id)}>
+              <div style={{...S.row,marginBottom:6}}>
+                <span style={{fontSize:15,fontWeight:700,color:C.text,flex:1,marginRight:8}}>{o.name}</span>
+                <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:20,color:"#fff",background:C.red}}>Просрочка {d} дн</span>
+              </div>
+              <div style={{fontSize:13,color:C.muted,marginBottom:6,lineHeight:1.4}}>{o.desc}</div>
+              <div style={S.row}>
+                <span style={{fontSize:12,color:C.red,fontWeight:600}}>Был срок: {fmtDate(o.dueDate)}</span>
+                <Badge status={o.status}/>
+              </div>
+            </div>
+          );
+        })}
+        {dueToday_.map(o=>todayCard(o,C.amber))}
+
+        {/* SECTION: Coming up */}
+        {(dueTomorrow_.length>0||dueSoon_.length>0||dueWeek_.length>0)&&<div style={{padding:"18px 12px 4px",fontSize:11,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em"}}>📅 Запланировано</div>}
+        {dueTomorrow_.length>0&&<div style={{padding:"4px 14px",fontSize:11,fontWeight:600,color:C.faint}}>Завтра ({dueTomorrow_.length})</div>}
+        {dueTomorrow_.map(o=>todayCard(o,"#f59e0b"))}
+        {dueSoon_.length>0&&<div style={{padding:"6px 14px 4px",fontSize:11,fontWeight:600,color:C.faint}}>Через 2–3 дня ({dueSoon_.length})</div>}
+        {dueSoon_.map(o=>todayCard(o,C.blue))}
+        {dueWeek_.length>0&&<div style={{padding:"6px 14px 4px",fontSize:11,fontWeight:600,color:C.faint}}>На этой неделе ({dueWeek_.length})</div>}
+        {dueWeek_.map(o=>todayCard(o,"#94a3b8"))}
+
+        {/* SECTION: Ready for pickup */}
+        {readyPU.length>0&&<div style={{padding:"18px 12px 4px",fontSize:11,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:"0.08em"}}>🛍 Готовы к выдаче — позвонить клиенту</div>}
+        {readyPU.map(o=>{
+          const bal=Math.max(0,Number(o.total||0)-Number(o.paid||0));
+          return(
+            <div key={o.id} style={{background:C.greenBg,borderLeft:`4px solid ${C.green}`,margin:"6px 12px",padding:"12px 14px",borderRadius:"0 10px 10px 0",cursor:"pointer"}} onClick={()=>openDetail(o.id)}>
+              <div style={{...S.row,marginBottom:6}}>
+                <span style={{fontSize:15,fontWeight:700,color:C.text,flex:1,marginRight:8}}>{o.name}</span>
+                {o.phone&&<a href={telHref(o.phone)} onClick={e=>e.stopPropagation()} style={{fontSize:13,color:"#fff",fontWeight:700,textDecoration:"none",background:C.green,padding:"6px 12px",borderRadius:20,whiteSpace:"nowrap"}}>📞 Позвонить</a>}
+              </div>
+              <div style={{fontSize:13,color:C.muted,marginBottom:bal>0?6:0,lineHeight:1.4}}>{o.desc}</div>
+              {bal>0&&<div style={{fontSize:12,fontWeight:700,color:C.amber,padding:"6px 10px",background:C.amberBg,borderRadius:6,display:"inline-block",marginTop:2}}>💰 При выдаче получить {money(bal)}</div>}
+            </div>
+          );
+        })}
+
+        {allEmpty&&<div style={{textAlign:"center",padding:"32px 20px",color:C.faint}}>
+          <div style={{fontSize:13,marginTop:6,lineHeight:1.6}}>Когда появятся заказы со сроками,<br/>они будут показаны здесь.</div>
+        </div>}
+
         <div style={{height:16}}/>
       </div>
     </>);
@@ -447,12 +595,12 @@ export default function App() {
       {screen==="today"       &&renderToday()}
       {toast&&<div style={S.toast_}>{toast}</div>}
       <nav style={S.nav}>
+        <button style={S.ntab(tab==="today")} onClick={()=>goTab("today")}>
+          <span style={{fontSize:22}}>⚡</span><span>Сегодня</span>
+          {urgentCount>0&&<span style={{position:"absolute",top:4,right:"calc(50% - 22px)",minWidth:18,height:18,borderRadius:9,padding:"0 5px",background:overdue.length>0?C.red:C.amber,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${C.card}`,boxSizing:"content-box"}}>{urgentCount}</span>}
+        </button>
         <button style={S.ntab(tab==="orders")} onClick={()=>goTab("orders")}><span style={{fontSize:22}}>📋</span><span>Заказы</span></button>
         <button style={S.ntab(tab==="finance")} onClick={()=>goTab("finance")}><span style={{fontSize:22}}>💰</span><span>Финансы</span></button>
-        <button style={S.ntab(tab==="today")} onClick={()=>goTab("today")}>
-          <span style={{fontSize:22}}>⚡</span><span>Сегодня{urgentCount>0?` (${urgentCount})`:""}</span>
-          {urgentCount>0&&<span style={{position:"absolute",top:6,right:"calc(50% - 14px)",width:8,height:8,borderRadius:4,background:C.red,border:`2px solid ${C.card}`}}/>}
-        </button>
       </nav>
     </div>
   );
